@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Optimizador de Minas</title>
+  <script src="https://unpkg.com/alpinejs" defer></script>
+</head>
+<body>
+  <div x-data="modelApp()">
+    <input type="file" @change="uploadFile($event)" />
+    <button @click="executeModel">Ejecutar modelo</button>
+    <p x-text="statusMessage"></p>
+
+    <template x-if="results">
+      <div>
+        <h3>Resultados del Blend:</h3>
+        <ul>
+          <li x-for="r in results.BlendSolution" x-text="`Año ${r.yearId}: ${r.value} tons`"></li>
+        </ul>
+      </div>
+    </template>
+  </div>
+
+  <script>
+    function modelApp() {
+      return {
+        runId: null,
+        statusMessage: '',
+        results: null,
+
+        uploadFile(e) {
+          const file = e.target.files[0];
+          let formData = new FormData();
+          formData.append('file', file);
+          fetch('/model/upload-data', { method: 'POST', body: formData });
+        },
+
+        async executeModel() {
+          const res = await fetch('/model/execute', { method: 'POST' });
+          const data = await res.json();
+          this.runId = data.runId;
+          this.statusMessage = 'Modelo en ejecución...';
+          this.pollStatus();
+        },
+
+        async pollStatus() {
+          const interval = setInterval(async () => {
+            const res = await fetch(`/model/status/${this.runId}`);
+            const data = await res.json();
+            if (data.status === 'completed') {
+              clearInterval(interval);
+              this.statusMessage = 'Ejecución finalizada';
+              this.fetchResults();
+            }
+          }, 3000);
+        },
+
+        async fetchResults() {
+          const res = await fetch(`/model/results/${this.runId}`);
+          this.results = await res.json();
+        },
+      };
+    }
+  </script>
+</body>
+</html>
